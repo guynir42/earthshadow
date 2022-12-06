@@ -64,7 +64,7 @@ def dist_from_shadow_center(ra, dec, time=None, orbit=None, obs=None, verbose=Fa
     if time is None:
         time = Time.now()
     if isinstance(time, float):  # assume JD??
-        time = Time(time, format='jd')
+        time = Time(time, format="jd")
     if isinstance(time, datetime.datetime):
         time = Time(time)
 
@@ -105,33 +105,33 @@ def dist_from_shadow_center(ra, dec, time=None, orbit=None, obs=None, verbose=Fa
     # we can express these coordinates as the observer location x0, y0, z0 plus
     # a vector t that points from the observer to the target (xt, yt, zt)
     # so (x,y,z) = (x0,y0,z0) + t * (xt,yt,zt)
-    xt = target_coords.cartesian._values['x']
-    yt = target_coords.cartesian._values['y']
-    zt = target_coords.cartesian._values['z']
+    xt = target_coords.cartesian._values["x"]
+    yt = target_coords.cartesian._values["y"]
+    zt = target_coords.cartesian._values["z"]
     if verbose:
-        print(f'xt= {xt}, yt= {yt}, zt= {zt}')
+        print(f"xt= {xt}, yt= {yt}, zt= {zt}")
 
     x0 = obs.to_geocentric()[0]
     y0 = obs.to_geocentric()[1]
     z0 = obs.to_geocentric()[2]
     if verbose:
-        print(f'x0= {x0}, y0= {y0}, z0= {z0}')
+        print(f"x0= {x0}, y0= {y0}, z0= {z0}")
 
     # this vector will intersect the orbital radius R when
     # (x0 + r*xt)^2 + (y0 + r*yt)^2 + (z0 + r*zt)^2 = R^2
     # the solution is r = (x0*xt+y0+xt+z0*zt) +/- sqrt((x0*xt+y0+xt+z0*zt)^2 - (x0^2+y0^2+z0^2-R^2))
     # which gives the range from observer to target
     term_a = x0 * xt + y0 * yt + z0 * zt
-    term_b = x0 ** 2 + y0 ** 2 + z0 ** 2 - orbit ** 2
-    range_plus = term_a + np.sqrt(term_a ** 2 - term_b)  # km
-    range_minus = term_a - np.sqrt(term_a ** 2 - term_b)  # km
+    term_b = x0**2 + y0**2 + z0**2 - orbit**2
+    range_plus = term_a + np.sqrt(term_a**2 - term_b)  # km
+    range_minus = term_a - np.sqrt(term_a**2 - term_b)  # km
 
     prefer_plus_range = abs(range_plus) < abs(range_minus)
 
     if verbose:
         print(
-            f'minus_range= {range_minus}, plus_range= {range_plus}, '
-            f'prefer_plus_range= {prefer_plus_range}'
+            f"minus_range= {range_minus}, plus_range= {range_plus}, "
+            f"prefer_plus_range= {prefer_plus_range}"
         )
 
     range = np.where(prefer_plus_range, range_plus, range_minus)
@@ -142,11 +142,11 @@ def dist_from_shadow_center(ra, dec, time=None, orbit=None, obs=None, verbose=Fa
         z=z0 + range * zt,
         frame="geocentrictrueecliptic",
         obstime=time,
-        representation_type='cartesian',
+        representation_type="cartesian",
     )
 
     if verbose:
-        print(f'new target: {new_target_coords}')
+        print(f"new target: {new_target_coords}")
 
     # now we can compute the distance from the anti-sun
     dist = new_target_coords.separation(anti_sun)
@@ -209,8 +209,8 @@ def get_observer_opposite_sun(time=None, altitutde=None):
     return obs
 
 
-if __name__ == '__main__':
-    time = Time('2022-09-21T00:00:00')
+if __name__ == "__main__":
+    time = Time("2022-09-21T00:00:00")
 
     anti = get_anti_sun(time)
     print(anti)
