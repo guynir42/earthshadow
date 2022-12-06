@@ -216,3 +216,4 @@ if __name__ == '__main__':
     obs = get_observer_opposite_sun(time)
     ret = dist_from_shadow_center(ra=anti.ra, dec=anti.dec, time=time)
     print(ret)
+    
