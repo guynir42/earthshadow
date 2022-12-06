@@ -210,10 +210,11 @@ def get_observer_opposite_sun(time=None, altitutde=None):
 
 
 if __name__ == '__main__':
-    time = Time('2022-03-21T00:00:00')
+    time = Time('2022-09-21T00:00:00')
 
     anti = get_anti_sun(time)
+    print(anti)
     obs = get_observer_opposite_sun(time)
-    ret = dist_from_shadow_center(ra=anti.ra, dec=anti.dec, time=time)
+    print(obs.to_geodetic())
+    ret = dist_from_shadow_center(ra=anti.ra, dec=anti.dec, time=time, obs=obs)
     print(ret)
-    
