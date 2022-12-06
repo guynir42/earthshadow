@@ -143,7 +143,7 @@ def dist_from_shadow_center(ra, dec, time=None, orbit=None, obs=None, verbose=Fa
         frame="geocentrictrueecliptic",
         obstime=time,
         representation_type="cartesian",
-    )
+    ).transform_to("icrs")
 
     if verbose:
         print(f"new target: {new_target_coords}")
@@ -213,8 +213,8 @@ if __name__ == "__main__":
     time = Time("2022-09-21T00:00:00")
 
     anti = get_anti_sun(time)
-    print(anti)
     obs = get_observer_opposite_sun(time)
-    print(obs.to_geodetic())
-    ret = dist_from_shadow_center(ra=anti.ra, dec=anti.dec, time=time, obs=obs)
+    ret = dist_from_shadow_center(
+        ra=anti.ra, dec=anti.dec, time=time, obs=obs, verbose=True
+    )
     print(ret)
