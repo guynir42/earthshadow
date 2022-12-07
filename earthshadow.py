@@ -292,7 +292,7 @@ def get_anti_sun(time=None):
     return anti_sun
 
 
-def get_observer_opposite_sun(time=None, altitude=None):
+def get_observer_opposite_sun(time=None, latitude=0, altitude=None):
     """
     Get the geolocation of an observer that is
     right under the anti-sun point.
@@ -324,7 +324,7 @@ def get_observer_opposite_sun(time=None, altitude=None):
     anti_sun = get_anti_sun(time)
     obs = coord.EarthLocation.from_geodetic(
         lon=anti_sun.ra,
-        lat=anti_sun.dec,
+        lat=anti_sun.dec + latitude * u.deg,
         height=altitude,
     )
 

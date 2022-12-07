@@ -105,13 +105,45 @@ def test_observer_under_shadow():
 
     assert ret < 0.1 * u.deg
 
-    offset = 10 * u.deg
+    # move the target on the RA axis a bit
+    offset = 5 * u.deg
     ret = dist_from_shadow_center(ra=anti.ra + offset, dec=anti.dec, time=time, obs=obs)
+    assert ret < 4.5 * u.deg  # measured by observer at center of earth
 
-    # return value is measured from the center of the Earth,
-    # while the offset angle is measured by a topocentric observer!
+    # now return a value measured from the Earth's surface
+    ret = dist_from_shadow_center(
+        ra=anti.ra + offset, dec=anti.dec, time=time, obs=obs, geocentric_output=False
+    )
+    assert abs(ret - offset) < 0.2 * u.deg  # measured by observer on the surface
 
-    assert abs(ret.deg - 10) < 0.1
+    # now move the target on the declination axis
+    ret = dist_from_shadow_center(
+        ra=anti.ra, dec=anti.dec + offset, time=time, obs=obs, geocentric_output=False
+    )
+    assert abs(ret - offset) < 0.2 * u.deg  # measured by observer on the surface
+
+    # now move the observer to a higher latitude
+    obs = get_observer_opposite_sun(time, latitude=30)
+    ret = dist_from_shadow_center(
+        ra=anti.ra, dec=anti.dec, time=time, obs=obs, geocentric_output=False
+    )
+
+    # the result should be offset by a parallax of about 1/2 Earth radius
+    # at the distance of 42000-6400 km (GEO) this would be about 5 degrees
+    assert abs(ret - 5 * u.deg) < 0.1 * u.deg
+
+    # try it for a lower orbit
+    ret = dist_from_shadow_center(
+        ra=anti.ra,
+        dec=anti.dec,
+        time=time,
+        obs=obs,
+        orbit="GPS",
+        geocentric_output=False,
+    )
+
+    # the parallax should be substantially larger
+    assert ret > 8 * u.deg
 
 
 def test_topocentric_to_geocentric():
