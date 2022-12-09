@@ -18,8 +18,70 @@ HIGH_EARTH_ORBIT = GEOSYNCHRONOUS_ORBIT * 2
 
 DEFAULT_ORBITAL_RADIUS = GEOSYNCHRONOUS_ORBIT
 
+DEFAULT_OBSERVATORY = "palomar"
 
-def get_earth_shadow(orbit=None, geocentric_orbit=True, geocentric_angle=True):
+
+def get_shadow_center(time=None, obs=None, orbit=None, geocentric_orbit=True):
+    """
+    Find the coordinates of the center of Earth's shadow
+    as seen by an observer on the ground at a given
+    observatory location.
+    For an observer right under the shadow's center
+    this would be the anti-solar point.
+    For other observers the point will move due to
+    parallax. Thus, for lower orbits, the effect
+    would be bigger.
+
+    Parameters
+    ----------
+    time: scalar float or string or astropy.time.Time
+        The time of the observation.
+        If given as string will be interpreted as ISO format.
+        Can also use "now" or None to use current time.
+        If given as float will be assumed to be JD.
+        Default is the current time.
+    orbit: scalar float or astropy.units.Quantity
+        The orbital radius at which we assume the targets are moving.
+        The lower the orbit, the bigger the parallax effect will be.
+        Default is 42164 km, which is the altitude of geosynchronous satellites.
+        The orbit is from the center of the Earth (see geocentric_orbit parameter).
+    obs: astropy.coordinates.EarthLocation, string, or 3-tuple of (lon, lat, alt)
+        The coordinates of the observatory.
+        Default is the coordinates of the mount Palomar.
+        If given as string will use the
+        `astropy.coordinates.EarthLocation.of_site` method.
+        If given as a list or tuple, will assume it is
+        (longitude, latitude, altitude) in degrees and meters.
+    geocentric_orbit: bool
+        If True, assume the orbit is given as the
+        distance from the center of the Earth (default).
+        If False, assume the orbit is given as the
+        distance above the Earth's surface.
+
+    Returns
+    -------
+    center: astropy.coordinates.SkyCoord
+        Returns the apparent position of the
+        Earth's shadow in the sky for the
+        given observatory position.
+
+    """
+    time = interpret_time(time)
+    obs = interpret_observatory(obs)
+    orbit = interpret_orbit(orbit, geocentric_orbit=geocentric_orbit)
+
+    anti_sun = get_anti_sun(time, orbit=orbit)
+
+    center_topocentric = anti_sun.transform_to(coord.CIRS(obstime=time, location=obs))
+
+    center = coord.SkyCoord(
+        ra=center_topocentric.ra, dec=center_topocentric.dec, frame="icrs"
+    )
+
+    return center
+
+
+def get_shadow_radius(orbit=None, geocentric_orbit=True, geocentric_angle=True):
     """
     Get the angle of the radius of Earth's shadow,
     where it intercepts the sky at an orbital radius,
@@ -54,7 +116,7 @@ def get_earth_shadow(orbit=None, geocentric_orbit=True, geocentric_angle=True):
     angle: astropy.units.Quantity
         The angle of the Earth shadow.
     """
-    orbit = interpret_orbit(orbit, geocentric=geocentric_orbit)
+    orbit = interpret_orbit(orbit, geocentric_orbit=geocentric_orbit)
 
     if orbit < EARTH_RADIUS:
         raise ValueError(
@@ -87,7 +149,7 @@ def dist_from_shadow_center(
     The angle is measured by an observer at the center of the Earth
     (default, but can also choose geocentric_output=False).
     This should be compared to the size of the shadow from the same
-    vantage point, as given by the `get_earth_shadow` function.
+    vantage point, as given by the `get_shadow_radius` function.
 
     For an orbit at infinite height,
     the angular distance is the same as
@@ -101,21 +163,24 @@ def dist_from_shadow_center(
         The right ascension of the object(s) in degrees.
     dec: scalar float or array of floats
         The declination of the object(s) in degrees.
-    time: scalar float or astropy.time.Time
+    time: scalar float or string or astropy.time.Time
         The time of the observation.
+        If given as string will be interpreted as ISO format.
+        Can also use "now" or None to use current time.
+        If given as float will be assumed to be JD.
         Default is the current time.
-    orbit: scalar float
+    orbit: scalar float or astropy.units.Quantity
         The orbital radius at which we assume the targets are moving.
         The lower the orbit, the bigger the Earth's shadow will be.
         Default is 42164 km, which is the altitude of geosynchronous satellites.
+        The orbit is from the center of the Earth (see geocentric_orbit parameter).
     obs: astropy.coordinates.EarthLocation, string, or 3-tuple of (lon, lat, alt)
         The coordinates of the observatory.
-        Default is the coordinates of the ZTF observatory.
+        Default is the coordinates of the mount Palomar.
         If given as string will use the
         `astropy.coordinates.EarthLocation.of_site` method.
         If given as a list or tuple, will assume it is
         (longitude, latitude, altitude) in degrees and meters.
-
     geocentric_orbit: bool
         If True, assume the orbit is given as the
         distance from the center of the Earth (default).
@@ -154,38 +219,14 @@ def dist_from_shadow_center(
     time = interpret_time(time)
 
     # verify/convert the orbit
-    orbit = interpret_orbit(orbit, geocentric=geocentric_orbit)
+    orbit = interpret_orbit(orbit, geocentric_orbit=geocentric_orbit)
 
     # verify/convert the observatory coordinates
-    if obs is None:
-        obs = coord.EarthLocation.of_site("palomar")
-    if isinstance(obs, str):
-        obs = coord.EarthLocation.of_site(obs)
-    if isinstance(obs, (list, tuple)):
-        if len(obs) != 3:
-            raise ValueError("obs must be a 3-tuple or list of (lon, lat, alt)")
-        new_obs = list(obs)
-        if not isinstance(new_obs[0], u.quantity.Quantity):
-            new_obs[0] = new_obs[0] * u.deg
-        if not isinstance(new_obs[1], u.quantity.Quantity):
-            new_obs[1] = new_obs[1] * u.deg
-        if not isinstance(new_obs[2], u.quantity.Quantity):
-            new_obs[2] = new_obs[2] * u.m
-
-        obs = coord.EarthLocation.from_geodetic(
-            lon=new_obs[0],
-            lat=new_obs[1],
-            height=new_obs[2],
-        )
-    if not isinstance(obs, coord.EarthLocation):
-        raise ValueError(
-            "obs must be a 3-tuple of (lon, lat, alt) "
-            "or a string with a name of a known observatory "
-            "or an astropy.coordinates.EarthLocation"
-        )
+    obs = interpret_observatory(obs)
+    time.location = obs
 
     if verbose:
-        print(f"observatory: {obs}")
+        print(f"observatory: {obs.to_geodetic()}")
 
     # get the anti-sun position in geo-centric coordinates
     anti_sun = get_anti_sun(time)
@@ -207,11 +248,19 @@ def dist_from_shadow_center(
     if verbose:
         print(f"xt= {xt}, yt= {yt}, zt= {zt}")
 
-    x0 = obs.to_geocentric()[0]
-    y0 = obs.to_geocentric()[1]
-    z0 = obs.to_geocentric()[2]
+    c = SkyCoord(
+        alt=90 * u.deg,
+        az=0 * u.deg,
+        distance=0 * u.m,
+        frame=coord.AltAz(obstime=time, location=obs),
+    )
+    c2 = c.transform_to("gcrs")  # this point in geocentric coordinates
+    x0 = c2.cartesian.get_xyz()[0]
+    y0 = c2.cartesian.get_xyz()[1]
+    z0 = c2.cartesian.get_xyz()[2]
+
     if verbose:
-        print(f"x0= {x0}, y0= {y0}, z0= {z0}")
+        print(f"x0= {x0.to('km')}, y0= {y0.to('km')}, z0= {z0.to('km')}")
 
     # this vector will intersect the orbital radius R when
     # (x0 + r*xt)^2 + (y0 + r*yt)^2 + (z0 + r*zt)^2 = R^2
@@ -226,7 +275,7 @@ def dist_from_shadow_center(
 
     if verbose:
         print(
-            f"minus_range= {range_minus}, plus_range= {range_plus}, "
+            f"minus_range= {range_minus.to('km')}, plus_range= {range_plus.to('km')}, "
             f"prefer_plus_range= {prefer_plus_range}"
         )
 
@@ -238,8 +287,8 @@ def dist_from_shadow_center(
 
     if verbose:
         print(
-            f"x= {x_final}, y= {y_final}, z= {z_final}, "
-            f"R= {np.sqrt(x_final**2 + y_final**2 + z_final**2)}"
+            f"x= {x_final.to('km')}, y= {y_final.to('km')}, z= {z_final.to('km')}, "
+            f"R= {np.sqrt(x_final**2 + y_final**2 + z_final**2).to('km')}"
         )
 
     new_target_coords = SkyCoord(
@@ -267,27 +316,51 @@ def dist_from_shadow_center(
     return dist
 
 
-def get_anti_sun(time=None):
+def get_anti_sun(time=None, orbit=None, geocentric_orbit=True):
     """
-    Get the anti-sun position in geo-centric ecliptic coordinates
+    Get the anti-sun position in geocentric ecliptic coordinates.
 
     Parameters
     ----------
     time: astropy.time.Time
         The time of the observation.
         Defaults to now.
+    orbit: scalar float or astropy.units.Quantity
+        The distance from the center of the Earth to assign
+        to the anti-solar point that is returned.
+        This is useful when applying parallax to the point
+        by transforming the coordinates to another location.
+        The orbit is from the center of the Earth (see geocentric_orbit parameter).
+    geocentric_orbit: bool
+        If True, assume the orbit is given as the
+        distance from the center of the Earth (default).
+        If False, assume the orbit is given as the
+        distance above the Earth's surface.
+
     Returns
     -------
     anti_sun: astropy.coordinates.SkyCoord
         The anti-sun position.
+
     """
     time = interpret_time(time)
+
     sun = coord.get_sun(time)
-    anti_sun = SkyCoord(
-        ra=np.mod(sun.ra + 180 * u.deg, 360 * u.deg),
-        dec=-sun.dec,
-        frame=coord.GCRS(obstime=time),  # geocentric
-    )
+
+    if orbit is None:
+        anti_sun = SkyCoord(
+            ra=np.mod(sun.ra + 180 * u.deg, 360 * u.deg),
+            dec=-sun.dec,
+            frame=coord.GCRS(obstime=time),  # geocentric
+        )
+    else:
+        orbit = interpret_orbit(orbit, geocentric_orbit=geocentric_orbit)
+        anti_sun = SkyCoord(
+            ra=np.mod(sun.ra + 180 * u.deg, 360 * u.deg),
+            dec=-sun.dec,
+            frame=coord.GCRS(obstime=time),  # geocentric
+            distance=orbit,
+        )
 
     return anti_sun
 
@@ -312,8 +385,7 @@ def get_observer_opposite_sun(time=None, latitude=0, altitude=None):
         The geolocation of an observer that is
         right under the anti-sun point.
     """
-    if time is None:
-        time = Time.now()
+    time = interpret_time(time)
 
     if altitude is None:
         altitude = 0
@@ -322,11 +394,27 @@ def get_observer_opposite_sun(time=None, latitude=0, altitude=None):
         altitude *= u.m
 
     anti_sun = get_anti_sun(time)
+
     obs = coord.EarthLocation.from_geodetic(
         lon=anti_sun.ra,
-        lat=anti_sun.dec + latitude * u.deg,
+        lat=anti_sun.dec,
         height=altitude,
     )
+    time.location = obs
+
+    rotation = anti_sun.ra - time.sidereal_time("mean").to(u.deg)
+
+    lon = np.mod(anti_sun.ra + rotation, 360 * u.deg)
+    lat = anti_sun.dec + latitude * u.deg
+    if lat > 90 * u.deg or lat < -90 * u.deg:
+        raise ValueError("latitude is out of bounds! ")
+
+    obs = coord.EarthLocation.from_geodetic(
+        lon=lon,
+        lat=lat,
+        height=altitude,
+    )
+    time.location = obs
 
     return obs
 
@@ -366,7 +454,7 @@ def topocentric_to_geocentric_angle(angle, orbit=None, geocentric_orbit=True):
     if not isinstance(angle, u.quantity.Quantity):
         angle *= u.deg
 
-    orbit = interpret_orbit(orbit, geocentric=geocentric_orbit)
+    orbit = interpret_orbit(orbit, geocentric_orbit=geocentric_orbit)
 
     return np.arcsin(np.sin(angle) * orbit / (orbit + EARTH_RADIUS)).to(u.deg)
 
@@ -406,7 +494,7 @@ def geocentric_to_topocentric_angle(angle, orbit=None, geocentric_orbit=True):
     if not isinstance(angle, u.quantity.Quantity):
         angle *= u.deg
 
-    orbit = interpret_orbit(orbit, geocentric=geocentric_orbit)
+    orbit = interpret_orbit(orbit, geocentric_orbit=geocentric_orbit)
 
     return np.arcsin(np.sin(angle) * (orbit + EARTH_RADIUS) / orbit).to(u.deg)
 
@@ -435,7 +523,7 @@ def interpret_time(time=None):
     return time
 
 
-def interpret_orbit(orbit=None, geocentric=True):
+def interpret_orbit(orbit=None, geocentric_orbit=True):
     """
     Convert user inputs for the orbital radius
     into a quantity with units of kilometers.
@@ -445,7 +533,7 @@ def interpret_orbit(orbit=None, geocentric=True):
     orbit: float or astropy.units.Quantity
         The orbital radius of the satellite.
         If given as float assume kilometers.
-    geocentric: bool
+    geocentric_orbit: bool
         If True, assume the orbit is measured
         from the center of the Earth (default).
         To measure the orbit height above the
@@ -475,22 +563,151 @@ def interpret_orbit(orbit=None, geocentric=True):
     if not isinstance(orbit, u.quantity.Quantity):
         orbit *= u.km
 
-    if not geocentric:
+    if not geocentric_orbit:
         orbit += EARTH_RADIUS
 
     return orbit
 
 
+def interpret_observatory(obs):
+    """
+    Convert user inputs for the observatory.
+    Default is the coordinates of the mount Palomar.
+    If given as string will use the
+    `astropy.coordinates.EarthLocation.of_site` method.
+    If given as a list or tuple, will assume it is
+    (longitude, latitude, altitude) in degrees and meters.
+    Returns an astropy.coordinates.EarthLocation object.
+
+    """
+    if obs is None:
+        obs = coord.EarthLocation.of_site(DEFAULT_OBSERVATORY)
+    if isinstance(obs, str):
+        obs = coord.EarthLocation.of_site(obs)
+    if isinstance(obs, (list, tuple)):
+        if len(obs) != 3:
+            raise ValueError("obs must be a 3-tuple or list of (lon, lat, alt)")
+        new_obs = list(obs)
+        if not isinstance(new_obs[0], u.quantity.Quantity):
+            new_obs[0] = new_obs[0] * u.deg
+        if not isinstance(new_obs[1], u.quantity.Quantity):
+            new_obs[1] = new_obs[1] * u.deg
+        if not isinstance(new_obs[2], u.quantity.Quantity):
+            new_obs[2] = new_obs[2] * u.m
+
+        obs = coord.EarthLocation.from_geodetic(
+            lon=new_obs[0],
+            lat=new_obs[1],
+            height=new_obs[2],
+        )
+    if not isinstance(obs, coord.EarthLocation):
+        raise ValueError(
+            "obs must be a 3-tuple of (lon, lat, alt) "
+            "or a string with a name of a known observatory "
+            "or an astropy.coordinates.EarthLocation"
+        )
+
+    return obs
+
+
+def show_shadow_region(
+    time=None, obs=None, orbit=None, ra_range=None, dec_range=None, edge=2
+):
+    """
+    Show a heatmap of the distance from the center of the shadow.
+    The plot will show the area around the Earth's shadow.
+    The output plotted using matplotlib, with values
+    of 0 outside the geometric shadow,
+    values of 1 inside the deep shadow
+    (the geometric minus the "edge")
+    and will transition smoothly between them.
+
+    Parameters
+    ----------
+    time: scalar float or astropy.time.Time
+        The time of the observation.
+        Default is the current time.
+    orbit: scalar float
+        The orbital radius at which we assume the targets are moving.
+        The lower the orbit, the bigger the Earth's shadow will be.
+        Default is 42164 km, which is the altitude of geosynchronous satellites.
+    obs: astropy.coordinates.EarthLocation, string, or 3-tuple of (lon, lat, alt)
+        The coordinates of the observatory.
+        Default is the coordinates of the mount Palomar.
+        If given as string will use the
+        `astropy.coordinates.EarthLocation.of_site` method.
+        If given as a list or tuple, will assume it is
+        (longitude, latitude, altitude) in degrees and meters.
+    ra_range: float or astropy.units.quantity.Quantity
+        The RA range (in degrees) around the center
+        of the Earth's shadow where we want to plot.
+        The default is twice the size of the shadow
+        as seen from the center of the Earth.
+    dec_range: float or astropy.units.quantity.Quantity
+        The declination range (in degrees) around the center
+        of the Earth's shadow where we want to plot.
+        The default is twice the size of the shadow
+        as seen from the center of the Earth.
+    edge: float or astropy.units.quantity.Quantity
+        The number of degrees into the geometric shadow
+        where light can still give partial illumination
+        due to Earth's atmosphere.
+
+    """
+    time = interpret_time(time)
+    orbit = interpret_orbit(orbit)
+    obs = interpret_observatory(obs)
+
+    # get the size of the Earth's shadow
+    radius = get_shadow_radius(orbit)
+
+    if ra_range is None:
+        ra_range = 2 * radius
+    if not isinstance(ra_range, u.quantity.Quantity):
+        ra_range *= u.deg
+
+    if dec_range is None:
+        dec_range = 2 * radius
+    if not isinstance(dec_range, u.quantity.Quantity):
+        dec_range *= u.deg
+
+    # get the position of the center of the shadow
+    center = get_anti_sun(time)
+
+    ra = np.linspace(center.ra.deg - ra_range / 2, center.ra.deg + ra_range / 2, 100)
+    dec = np.linspace(
+        center.dec.deg - dec_range / 2, center.dec.deg + dec_range / 2, 100
+    )
+
+    distmap = np.zeros((len(ra), len(dec)))
+    for i, r in enumerate(ra):
+        for j, d in enumerate(dec):
+            distmap[i, j] = dist_from_shadow_center(
+                ra=r,
+                dec=d,
+                time=time,
+                orbit=orbit,
+                obs=obs,
+            )
+    return distmap
+
+
 if __name__ == "__main__":
-    time = Time("2023-09-23T06:50:00")
+    from astropy.coordinates import AltAz
+
+    time = Time("2020-06-23 06:50:00")
 
     anti = get_anti_sun(time)
     obs = get_observer_opposite_sun(time)
+
+    aa = AltAz(location=obs, obstime=time)
+    anti_aa = anti.transform_to(aa)
+    # print(anti_aa)
+
     ret = dist_from_shadow_center(
-        ra=anti.ra + 0.0 * u.deg,
-        dec=anti.dec + 5.0 * u.deg,
+        ra=anti.ra,
+        dec=anti.dec,
         time=time,
-        obs=(0, 0, 0),
-        verbose=True,
-        orbit=None,
+        obs=obs,
+        verbose=1,
     )

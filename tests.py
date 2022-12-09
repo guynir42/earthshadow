@@ -1,6 +1,7 @@
 import pytest
 import numpy as np
 
+import astropy.coordinates as coord
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 import astropy.units as u
@@ -62,65 +63,101 @@ def test_user_inputs():
     assert abs(a1 - c1) > 1 * u.deg
 
 
+def test_shadow_center():
+    time = Time("2023-09-23T00:50:00")  # equinox
+    anti = get_anti_sun(time, orbit="GEO")
+    obs = get_observer_opposite_sun(time)
+    print(f"observer: {obs.to_geodetic()}")
+
+    # this should be the same as the anti-sun
+    a1 = get_shadow_center(time=time, obs=obs, orbit="GEO")
+    print(a1)
+    assert anti.separation(a1) < 1 * u.deg
+
+
 def test_earth_shadow_sizes():
     # default value should be GEO
-    a = get_earth_shadow()
+    a = get_shadow_radius()
     assert abs(a.value - 8.7) < 0.1
 
-    a1 = get_earth_shadow("GEO")
+    a1 = get_shadow_radius("GEO")
     assert abs(a1 - a) < 0.1 * u.deg
 
     # this is also close to GEO
-    a2 = get_earth_shadow(42000)
+    a2 = get_shadow_radius(42000)
     assert abs(a2 - a) < 0.1 * u.deg
 
     # this is about twice Earth's radius
-    a3 = get_earth_shadow(13000)
+    a3 = get_shadow_radius(13000)
     assert a3 > 2 * a
 
     # this is lower than Earth's radius
     with pytest.raises(ValueError) as e:
-        get_earth_shadow(6000)
+        get_shadow_radius(6000)
         assert "is below Earth radius" in str(e)
 
     # should work if geocentric_orbit=False
-    a4 = get_earth_shadow(6000, geocentric_orbit=False)
+    a4 = get_shadow_radius(6000, geocentric_orbit=False)
 
     assert a4 > 3 * a
 
     # what about low Earth orbit?
-    a5 = get_earth_shadow(300, geocentric_orbit=False)
+    a5 = get_shadow_radius(300, geocentric_orbit=False)
     assert a5 > 5 * a
 
     # make sure the keywords work in geocentric too
-    a6 = get_earth_shadow("LEO", geocentric_orbit=True)
+    a6 = get_shadow_radius("LEO", geocentric_orbit=True)
     assert abs(a6 - a5) < 0.1 * u.deg
 
 
 def test_observer_under_shadow():
-    time = Time("2022-09-21T00:00:00")  # autumn equinox
+    time = Time("2021-06-20T12:00:00")  # autumn equinox
     anti = get_anti_sun(time)
     obs = get_observer_opposite_sun(time)
-    ret = dist_from_shadow_center(ra=anti.ra, dec=anti.dec, time=time, obs=obs)
+
+    aa = coord.AltAz(location=obs, obstime=time)
+    anti_aa = anti.transform_to(aa)
+
+    assert 90 * u.deg - anti_aa.alt < 1 * u.deg  # should be close to 90 degrees
+
+    ret = dist_from_shadow_center(
+        ra=anti.ra, dec=anti.dec, time=time, obs=obs, verbose=0
+    )
 
     assert ret < 0.1 * u.deg
 
-    # move the target on the RA axis a bit
+    # move the target on the declination axis
     offset = 5 * u.deg
-    ret = dist_from_shadow_center(ra=anti.ra + offset, dec=anti.dec, time=time, obs=obs)
-    assert ret < 4.5 * u.deg  # measured by observer at center of earth
+    ret = dist_from_shadow_center(ra=anti.ra, dec=anti.dec + offset, time=time, obs=obs)
+    assert (
+        abs(ret - offset * 0.87) < 0.1 * u.deg
+    )  # measured by observer at center of Earth
 
-    # now return a value measured from the Earth's surface
-    ret = dist_from_shadow_center(
-        ra=anti.ra + offset, dec=anti.dec, time=time, obs=obs, geocentric_output=False
-    )
-    assert abs(ret - offset) < 0.2 * u.deg  # measured by observer on the surface
-
-    # now move the target on the declination axis
     ret = dist_from_shadow_center(
         ra=anti.ra, dec=anti.dec + offset, time=time, obs=obs, geocentric_output=False
     )
-    assert abs(ret - offset) < 0.2 * u.deg  # measured by observer on the surface
+    assert abs(ret - offset) < 0.1 * u.deg  # measured by observer on the surface
+
+    # move the target on the RA axis a bit
+    ret = dist_from_shadow_center(
+        ra=anti.ra + offset, dec=anti.dec, time=time, obs=obs, verbose=1
+    )
+    assert (
+        abs(ret / np.cos(anti.dec) - offset * 0.87) < 0.2 * u.deg
+    )  # measured by observer at center of Earth
+
+    # now return a value measured from the Earth's surface
+    ret = dist_from_shadow_center(
+        ra=anti.ra + offset,
+        dec=anti.dec,
+        time=time,
+        obs=obs,
+        verbose=1,
+        geocentric_output=False,
+    )
+    assert (
+        abs(ret / np.cos(anti.dec) - offset) < 0.2 * u.deg
+    )  # measured by observer on the surface
 
     # now move the observer to a higher latitude
     obs = get_observer_opposite_sun(time, latitude=30)
