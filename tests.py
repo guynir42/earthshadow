@@ -64,15 +64,33 @@ def test_user_inputs():
 
 
 def test_shadow_center():
-    time = Time("2023-09-23T00:50:00")  # equinox
+    time = Time("2023-09-23T00:00:00")  # equinox
     anti = get_anti_sun(time, orbit="GEO")
     obs = get_observer_opposite_sun(time)
-    print(f"observer: {obs.to_geodetic()}")
 
     # this should be the same as the anti-sun
     a1 = get_shadow_center(time=time, obs=obs, orbit="GEO")
-    print(a1)
-    assert anti.separation(a1) < 1 * u.deg
+
+    assert anti.separation(a1) < 0.2 * u.deg
+
+    time = Time("2021-05-12T18:00:00")  # random time
+    anti = get_anti_sun(time, orbit="GEO")
+    obs = get_observer_opposite_sun(time)
+
+    # this should be the same as the anti-sun
+    a2 = get_shadow_center(time=time, obs=obs, orbit="GEO")
+
+    assert anti.separation(a2) < 0.2 * u.deg
+
+    # now get an observer at a different location:
+    time = Time("2021-09-29T08:00:00")  # equinox, midnight at Palomar
+    anti = get_anti_sun(time, orbit="GEO")
+    obs = "palomar"
+
+    # this should be offset because of parallax
+    a3 = get_shadow_center(time=time, obs=obs, orbit="GEO")
+
+    assert abs(anti.separation(a3) - 5 * u.deg) < 0.1 * u.deg
 
 
 def test_earth_shadow_sizes():
