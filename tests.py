@@ -129,7 +129,7 @@ def test_earth_shadow_sizes():
 
 
 def test_observer_under_shadow():
-    time = Time("2021-06-20T12:00:00")  # autumn equinox
+    time = Time("2021-09-23T12:00:00")  # autumn equinox
     anti = get_anti_sun(time)
     obs = get_observer_opposite_sun(time)
 
@@ -147,14 +147,14 @@ def test_observer_under_shadow():
     # move the target on the declination axis
     offset = 5 * u.deg
     ret = dist_from_shadow_center(ra=anti.ra, dec=anti.dec + offset, time=time, obs=obs)
-    assert (
-        abs(ret - offset * 0.87) < 0.1 * u.deg
-    )  # measured by observer at center of Earth
+
+    # measured by observer at center of Earth:
+    assert abs(ret - offset * 0.87) < 0.2 * u.deg
 
     ret = dist_from_shadow_center(
         ra=anti.ra, dec=anti.dec + offset, time=time, obs=obs, geocentric_output=False
     )
-    assert abs(ret - offset) < 0.1 * u.deg  # measured by observer on the surface
+    assert abs(ret - offset) < 0.2 * u.deg  # measured by observer on the surface
 
     # move the target on the RA axis a bit
     ret = dist_from_shadow_center(

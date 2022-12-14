@@ -611,7 +611,13 @@ def interpret_observatory(obs):
 
 
 def show_shadow_region(
-    time=None, obs=None, orbit=None, ra_range=None, dec_range=None, edge=2
+    time=None,
+    obs=None,
+    orbit=None,
+    ra_range=None,
+    dec_range=None,
+    edge=2,
+    multiplier=4,
 ):
     """
     Show a heatmap of the distance from the center of the shadow.
@@ -651,8 +657,12 @@ def show_shadow_region(
     edge: float or astropy.units.quantity.Quantity
         The number of degrees into the geometric shadow
         where light can still give partial illumination
-        due to Earth's atmosphere.
-
+        due to Earth's atmosphere. Default is 2 degrees.
+    multiplier: float
+        The number of times the size of the Earth's shadow
+        to use as the default size of the plot.
+        Only used if not given ra_range or dec_range.
+        Default is 4.
     """
     time = interpret_time(time)
     orbit = interpret_orbit(orbit)
@@ -662,34 +672,46 @@ def show_shadow_region(
     radius = get_shadow_radius(orbit)
 
     if ra_range is None:
-        ra_range = 2 * radius
+        ra_range = multiplier * radius
     if not isinstance(ra_range, u.quantity.Quantity):
         ra_range *= u.deg
 
     if dec_range is None:
-        dec_range = 2 * radius
+        dec_range = multiplier * radius
     if not isinstance(dec_range, u.quantity.Quantity):
         dec_range *= u.deg
+
+    if not isinstance(edge, u.quantity.Quantity):
+        edge *= u.deg
 
     # get the position of the center of the shadow
     center = get_anti_sun(time)
 
-    ra = np.linspace(center.ra.deg - ra_range / 2, center.ra.deg + ra_range / 2, 100)
-    dec = np.linspace(
-        center.dec.deg - dec_range / 2, center.dec.deg + dec_range / 2, 100
-    )
+    ra = np.linspace(center.ra - ra_range / 2, center.ra + ra_range / 2, 100)
+    dec = np.linspace(center.dec - dec_range / 2, center.dec + dec_range / 2, 100)
 
-    distmap = np.zeros((len(ra), len(dec)))
-    for i, r in enumerate(ra):
-        for j, d in enumerate(dec):
-            distmap[i, j] = dist_from_shadow_center(
-                ra=r,
-                dec=d,
-                time=time,
-                orbit=orbit,
-                obs=obs,
-            )
-    return distmap
+    [ra_mesh, dec_mesh] = np.meshgrid(ra, dec)
+
+    distmap = dist_from_shadow_center(
+        ra=ra_mesh, dec=dec_mesh, time=time, orbit=orbit, obs=obs
+    )
+    distmap = distmap.value
+
+    shadow = distmap < radius.value
+    deep_shadow = distmap < (radius - edge).value
+    transition = (radius.value + edge.value - distmap) / edge.value - 1
+    transition[shadow == 0] = 0
+    transition[deep_shadow] = 1
+
+    ax = plt.subplot(111)
+    ax.set_aspect("equal")
+    ax.imshow(
+        transition, extent=[ra[0].value, ra[-1].value, dec[0].value, dec[-1].value]
+    )
+    ax.set_xlabel("RA (deg)")
+    ax.set_ylabel("Dec (deg)")
+
+    return ax
 
 
 if __name__ == "__main__":
