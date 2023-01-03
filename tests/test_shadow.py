@@ -6,7 +6,7 @@ from astropy.time import Time
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from .earthshadow import *
+from src.earthshadow import *
 
 
 def test_user_inputs():
