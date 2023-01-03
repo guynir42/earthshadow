@@ -1,12 +1,12 @@
 import pytest
 import numpy as np
-
+import datetime
 import astropy.coordinates as coord
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-from earthshadow import *
+from .earthshadow import *
 
 
 def test_user_inputs():
