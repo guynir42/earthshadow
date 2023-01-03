@@ -40,11 +40,6 @@ def get_shadow_center(time=None, obs=None, orbit=None, geocentric_orbit=True):
         Can also use "now" or None to use current time.
         If given as float will be assumed to be JD.
         Default is the current time.
-    orbit: scalar float or astropy.units.Quantity
-        The orbital radius at which we assume the targets are moving.
-        The lower the orbit, the bigger the parallax effect will be.
-        Default is 42164 km, which is the altitude of geosynchronous satellites.
-        The orbit is from the center of the Earth (see geocentric_orbit parameter).
     obs: astropy.coordinates.EarthLocation, string, or 3-tuple of (lon, lat, alt)
         The coordinates of the observatory.
         Default is the coordinates of the mount Palomar.
@@ -52,6 +47,11 @@ def get_shadow_center(time=None, obs=None, orbit=None, geocentric_orbit=True):
         `astropy.coordinates.EarthLocation.of_site` method.
         If given as a list or tuple, will assume it is
         (longitude, latitude, altitude) in degrees and meters.
+    orbit: scalar float or astropy.units.Quantity
+        The orbital radius at which we assume the targets are moving.
+        The lower the orbit, the bigger the parallax effect will be.
+        Default is 42164 km, which is the altitude of geosynchronous satellites.
+        The orbit is from the center of the Earth (see geocentric_orbit parameter).
     geocentric_orbit: bool
         If True, assume the orbit is given as the
         distance from the center of the Earth (default).
@@ -551,11 +551,11 @@ def interpret_orbit(orbit=None, geocentric_orbit=True):
         orbit = orbit.lower().replace(" ", "").replace("_", "").replace("-", "")
         if orbit in ("geosynchronous", "geosync", "geo"):
             orbit = DEFAULT_ORBITAL_RADIUS
-        elif orbit in ("lowearthorbit", "lowearth", "leo"):
+        elif orbit in ("lowearthorbit", "lowearth", "leo", "low"):
             orbit = LOW_EARTH_ORBIT
-        elif orbit in ("mediumearthorbit", "mediumearth", "meo"):
+        elif orbit in ("mediumearthorbit", "mediumearth", "meo", "medium"):
             orbit = MEDIUM_EARTH_ORBIT
-        elif orbit in ("highearthorbit", "highearth", "heo"):
+        elif orbit in ("highearthorbit", "highearth", "heo", "high"):
             orbit = HIGH_EARTH_ORBIT
         elif orbit in ("groundpositioningsatellite", "groundpositioning", "gps"):
             orbit = GPS_SATELITE_ORBIT
