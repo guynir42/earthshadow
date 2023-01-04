@@ -31,7 +31,8 @@ it is usually good enough to to test this for GEO altitude.
 
 ## Installation
 
-To be added...
+Just `pip install earthshadow`.
+There are no exceptional dependencies other than astropy.
 
 ## Usage
 
