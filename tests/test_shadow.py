@@ -37,14 +37,18 @@ def test_user_inputs():
     assert np.isclose(a1.value, a3.value)
     assert np.isclose(a1.value, a4.value)
 
+    t2 = Time("2021-09-29T08:00:00")  # equinox, midnight at Palomar
+
     # test the RA/Dec inputs
     ra = 10
     dec = 20
-    a1 = dist_from_shadow_center(ra, dec)
-    a2 = dist_from_shadow_center(ra * u.deg, dec * u.deg)
-    a3 = dist_from_shadow_center([ra], [dec])
-    a4 = dist_from_shadow_center(np.array([ra]), np.array([dec]))
-    a5 = dist_from_shadow_center(np.array([ra]) * u.deg, np.array([dec]) * u.deg)
+    a1 = dist_from_shadow_center(ra, dec, time=t2)
+    a2 = dist_from_shadow_center(ra * u.deg, dec * u.deg, time=t2)
+    a3 = dist_from_shadow_center([ra], [dec], time=t2)
+    a4 = dist_from_shadow_center(np.array([ra]), np.array([dec]), time=t2)
+    a5 = dist_from_shadow_center(
+        np.array([ra]) * u.deg, np.array([dec]) * u.deg, time=t2
+    )
 
     assert abs(a1 - a2) < 0.01 * u.deg
     assert abs(a1 - a3) < 0.01 * u.deg
@@ -52,14 +56,14 @@ def test_user_inputs():
     assert abs(a1 - a5) < 0.01 * u.deg
 
     # test the observatory inputs
-    b1 = dist_from_shadow_center(ra, dec, obs="Palomar")
-    b2 = dist_from_shadow_center(ra, dec, obs=(-116.863, 33.356, 1700))
+    b1 = dist_from_shadow_center(ra, dec, time=t2, obs="Palomar")
+    b2 = dist_from_shadow_center(ra, dec, time=t2, obs=(-116.863, 33.356, 1700))
 
     assert abs(a1 - b1) < 0.01 * u.deg
     assert abs(a1 - b2) < 0.01 * u.deg
 
     # this should be a different place
-    c1 = dist_from_shadow_center(ra, dec, obs="Paranal Observatory")
+    c1 = dist_from_shadow_center(ra, dec, time=t2, obs="Paranal Observatory")
     assert abs(a1 - c1) > 1 * u.deg
 
 
